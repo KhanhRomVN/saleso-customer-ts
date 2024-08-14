@@ -15,7 +15,7 @@ const LoginPage: React.FC = () => {
       const response = await axios.post(`${BACKEND_URI}/auth/login`, {
         email,
         password,
-        role: "seller",
+        role: "customer",
       });
       const { currentUser, accessToken, refreshToken } = response.data;
       localStorage.setItem("currentUser", JSON.stringify(currentUser));
