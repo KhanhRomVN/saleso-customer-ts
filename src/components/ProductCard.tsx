@@ -51,12 +51,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <img
               src={productData.image}
               alt={productData.name}
-              className="w-full h-56 object-cover rounded-lg transition-all duration-300 transform hover:scale-105"
+              className="w-full h-60 object-cover rounded-lg transition-all duration-300 transform hover:scale-105"
             />
             <AnimatePresence>
               {isHovered && (
                 <motion.div
-                  className="absolute top-2 right-2 space-y-2"
+                  className="absolute top-2 right-2 space-y-2 "
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
@@ -69,7 +69,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                       e.stopPropagation();
                       onHandleAddWishlist(productData._id);
                     }}
-                    className="bg-white/90 hover:bg-white shadow-md transition-all duration-200"
+                    className="bg-background shadow-md transition-all duration-200"
                   >
                     <Heart className="h-4 w-4 text-red-500" />
                   </Button>
@@ -79,7 +79,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                         size="icon"
                         variant="secondary"
                         onClick={(e) => e.stopPropagation()}
-                        className="bg-white/90 hover:bg-white shadow-md transition-all duration-200"
+                        className="bg-background shadow-md transition-all duration-200"
                       >
                         <Eye className="h-4 w-4 text-blue-500" />
                       </Button>
