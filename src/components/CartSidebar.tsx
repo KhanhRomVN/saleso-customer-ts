@@ -40,7 +40,7 @@ interface Product {
 
 interface CartData {
   product_id: string;
-  attributes_value?: string;
+  selected_attributes_value?: string;
   quantity: number;
 }
 
@@ -67,6 +67,7 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
       try {
         const response = await axios.get(`${BACKEND_URI}/product/${productId}`);
         setProduct(response.data);
+        setQuantity(1);
         if (response.data.attributes && response.data.attributes.length > 0) {
           setSelectedAttribute(response.data.attributes[0].attributes_value);
         }
@@ -134,18 +135,16 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
     };
 
     if (product.attributes && selectedAttribute) {
-      cartData.attributes_value = selectedAttribute;
+      cartData.selected_attributes_value = selectedAttribute;
     }
 
     try {
-      console.log(cartData);
-      
-      // const accessToken = localStorage.getItem("accessToken");
-      // const response = await axios.post(`${BACKEND_URI}/cart/add`, cartData, {
-      //   headers: { accessToken },
-      // });
-      // console.log("Product added to cart:", response.data);
-      // onClose();
+      const accessToken = localStorage.getItem("accessToken");
+      const response = await axios.post(`${BACKEND_URI}/cart`, cartData, {
+        headers: { accessToken },
+      });
+      console.log("Product added to cart:", response.data);
+      onClose();
     } catch (error) {
       console.error("Error adding product to cart:", error);
     }
@@ -271,6 +270,9 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                       </Button>
                     ))}
                   </div>
+                  {!product.attributes_name && (
+                    <p className="text-sm mb-2">Stock: {product.stock}</p>
+                  )}
 
                   {product.attributes ? (
                     <div className="mb-4">
@@ -293,7 +295,8 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                             className="w-full text-xs"
                           >
                             {attr.attributes_value}
-                            <br />${attr.attributes_price}
+                            <br />${attr.attributes_price} -
+                            {attr.attributes_quantity}
                           </Button>
                         ))}
                       </div>
