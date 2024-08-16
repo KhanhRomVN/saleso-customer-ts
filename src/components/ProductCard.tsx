@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Heart, Eye, ShoppingCart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import axios from "axios";
+import { BACKEND_URI } from "@/api";
 
 interface ProductCardProps {
   productData: {
@@ -31,6 +33,31 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   const handleCardClick = () => {
     navigate(`/product/${productData._id}`);
+  };
+
+  const handleAddToWishlist = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const accessToken = localStorage.getItem("accessToken");
+      if (!accessToken) {
+        console.error("No access token found");
+        return;
+      }
+
+      await axios.post(
+        `${BACKEND_URI}/wishlist/items/${productData._id}`,
+        {},
+        {
+          headers: {
+            accessToken,
+          },
+        }
+      );
+
+      onHandleAddWishlist(productData._id);
+    } catch (error) {
+      console.error("Error adding to wishlist:", error);
+    }
   };
 
   return (
@@ -65,10 +92,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   <Button
                     size="icon"
                     variant="secondary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onHandleAddWishlist(productData._id);
-                    }}
+                    onClick={handleAddToWishlist}
                     className="bg-background shadow-md transition-all duration-200"
                   >
                     <Heart className="h-4 w-4 text-red-500" />
