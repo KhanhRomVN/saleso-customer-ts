@@ -33,6 +33,7 @@ import {
 
 import AccountContent from "./components/AccountContent";
 import AddressContent from "./components/AddressContent";
+import OrderContent from "./components/OrderContent";
 
 const SettingPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState("account");
@@ -96,10 +97,6 @@ const SettingPage: React.FC = () => {
       </Tabs>
     </div>
   );
-};
-
-const OrderContent = () => {
-  return <div>Order</div>;
 };
 
 const PaymentContent = () => {

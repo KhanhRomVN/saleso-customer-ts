@@ -158,16 +158,16 @@ const CheckoutPage: React.FC = () => {
       }
 
       if (paymentMethod === "Pay on delivery") {
-        // const response = await axios.post(
-        //   `${BACKEND_URI}/order`,
-        //   transformedData,
-        //   {
-        //     headers: {
-        //       accessToken,
-        //     },
-        //   }
-        // );
-        // console.log("Order created successfully:", response.data);
+        const response = await axios.post(
+          `${BACKEND_URI}/order`,
+          transformedData,
+          {
+            headers: {
+              accessToken,
+            },
+          }
+        );
+        console.log("Order created successfully:", response.data);
         navigate("/order-success");
       } else {
         localStorage.setItem("paymentData", JSON.stringify(transformedData));

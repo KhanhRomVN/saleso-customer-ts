@@ -20,14 +20,17 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Mail, Lock, Camera, Info } from "lucide-react";
-import Cropper from "react-easy-crop";
+import { User, Mail, Lock, Camera, Info, Loader2 } from "lucide-react";
+import Cropper, { Area } from "react-easy-crop";
 import axios from "axios";
 import {
   handleImageSelect,
   cropImageFile,
   handleUploadCroppedImage,
 } from "@/utils/imageUtils";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { BACKEND_URI } from "@/api";
 
 const AccountContent: React.FC = () => {
   const [user, setUser] = useState({
@@ -43,25 +46,36 @@ const AccountContent: React.FC = () => {
     about: "",
   });
 
-  const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
-  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
-  const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  const [dialogState, setDialogState] = useState({
+    verify: false,
+    email: false,
+    password: false,
+    avatar: false,
+    otp: false,
+    forgetPassword: false,
+    newPassword: false,
+  });
+
+  const [formState, setFormState] = useState({
+    newEmail: "",
+    currentPassword: "",
+    newPassword: "",
+    verifyEmail: "",
+    verifyPassword: "",
+    forgetPasswordEmail: "",
+    newPasswordForReset: "",
+    otp: "",
+    emailOtp: "",
+  });
+
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [newEmail, setNewEmail] = useState("");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [verifyEmail, setVerifyEmail] = useState("");
-  const [verifyPassword, setVerifyPassword] = useState("");
-  const [isForgetPasswordDialogOpen, setIsForgetPasswordDialogOpen] =
-    useState(false);
   const [verifyPurpose, setVerifyPurpose] = useState<
     "email" | "password" | null
   >(null);
-  const [forgetPasswordEmail, setForgetPasswordEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     fetchUserData();
@@ -69,18 +83,36 @@ const AccountContent: React.FC = () => {
 
   const fetchUserData = async () => {
     try {
+      setIsLoading(true);
       const accessToken = localStorage.getItem("accessToken");
-      const response = await axios.get("http://localhost:8080/user/user-data", {
+      const response = await axios.get(`${BACKEND_URI}/user/user-data`, {
         headers: { accessToken },
       });
-      setUser(response.data);
+
+      setUser((prevUser) => ({
+        ...prevUser,
+        ...response.data,
+        name: response.data.name || "",
+        avatar_uri: response.data.avatar_uri || "",
+        age: response.data.age || 0,
+        gender: response.data.gender || "",
+        birthday: response.data.birthday || "",
+        about: response.data.about || "",
+      }));
     } catch (error) {
       console.error("Error fetching user data:", error);
+      toast.error("Failed to fetch user data");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleInputChange = (field: string, value: string | number) => {
-    setUser({ ...user, [field]: value });
+    setUser((prevUser) => ({ ...prevUser, [field]: value }));
+  };
+
+  const handleFormChange = (field: string, value: string) => {
+    setFormState((prevState) => ({ ...prevState, [field]: value }));
   };
 
   const calculateAge = (birthday: string): number => {
@@ -96,153 +128,235 @@ const AccountContent: React.FC = () => {
 
   const handleUpdate = async (fields: string[]) => {
     try {
-      const values = fields.map((field) => {
-        if (field === "age") {
-          return calculateAge(user.birthday);
-        }
-        return user[field];
-      });
+      setIsLoading(true);
+      const values = fields
+        .map((field) => {
+          if (field === "age" && user.birthday) {
+            return calculateAge(user.birthday);
+          }
+          return user[field as keyof typeof user] || null;
+        })
+        .filter((value) => value !== null);
+
+      const fieldsToUpdate = fields.filter(
+        (field, index) => values[index] !== null
+      );
 
       const accessToken = localStorage.getItem("accessToken");
       await axios.post(
-        "http://localhost:8080/user/update/detail",
-        {
-          field: fields,
-          value: values,
-        },
-        {
-          headers: { accessToken },
-        }
+        `${BACKEND_URI}/user/update/detail`,
+        { field: fieldsToUpdate, value: values.filter((v) => v !== null) },
+        { headers: { accessToken } }
       );
-
-      alert("Update successful!");
+      toast.success("Update successful!");
       fetchUserData();
     } catch (error) {
       console.error("Error updating user details:", error);
-      alert("Failed to update user details.");
+      toast.error("Failed to update user details");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleVerifyAccount = async () => {
     try {
+      setIsLoading(true);
       const accessToken = localStorage.getItem("accessToken");
       await axios.post(
-        "http://localhost:8080/user/verify",
+        `${BACKEND_URI}/user/verify`,
         {
-          email: verifyEmail,
-          password: verifyPassword,
+          email: formState.verifyEmail,
+          password: formState.verifyPassword,
         },
-        {
-          headers: { accessToken },
-        }
+        { headers: { accessToken } }
       );
-      setIsVerifyDialogOpen(false);
-      if (verifyPurpose === "email") {
-        setIsEmailDialogOpen(true);
-      } else if (verifyPurpose === "password") {
-        setIsPasswordDialogOpen(true);
-      }
+      setDialogState((prev) => ({
+        ...prev,
+        verify: false,
+        ...(verifyPurpose ? { [verifyPurpose]: true } : {}),
+      }));
     } catch (error) {
       console.error("Error verifying account:", error);
-      alert("Failed to verify account.");
+      toast.error("Failed to verify account");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleEmailChange = async () => {
     try {
+      setIsLoading(true);
       const accessToken = localStorage.getItem("accessToken");
       await axios.post(
-        "http://localhost:8080/user/update-email",
-        { newEmail },
-        {
-          headers: { accessToken },
-        }
+        `${BACKEND_URI}/user/verify/new-email`,
+        { newEmail: formState.newEmail },
+        { headers: { accessToken } }
       );
-      setIsEmailDialogOpen(false);
+      setDialogState((prev) => ({ ...prev, email: false, otp: true }));
+      toast.success("OTP sent to your new email. Please check your inbox.");
+    } catch (error) {
+      console.error("Error sending OTP:", error);
+      toast.error("Failed to send OTP");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirmEmailChange = async () => {
+    try {
+      setIsLoading(true);
+      const accessToken = localStorage.getItem("accessToken");
+      await axios.post(
+        `${BACKEND_URI}/user/update-email`,
+        { newEmail: formState.newEmail, otp: formState.emailOtp },
+        { headers: { accessToken } }
+      );
+      setDialogState((prev) => ({ ...prev, otp: false }));
       fetchUserData();
-      alert("Email updated successfully!");
+      toast.success("Email updated successfully!");
     } catch (error) {
       console.error("Error updating email:", error);
-      alert("Failed to update email.");
+      toast.error("Failed to update email");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handlePasswordChange = async () => {
     try {
+      setIsLoading(true);
       const accessToken = localStorage.getItem("accessToken");
       await axios.post(
-        "http://localhost:8080/user/update-password",
-        {
-          newPassword,
-        },
-        {
-          headers: { accessToken },
-        }
+        `${BACKEND_URI}/user/update/password`,
+        { newPassword: formState.newPassword },
+        { headers: { accessToken } }
       );
-      setIsPasswordDialogOpen(false);
-      alert("Password updated successfully!");
+      setDialogState((prev) => ({ ...prev, password: false }));
+      toast.success("Password updated successfully!");
     } catch (error) {
       console.error("Error updating password:", error);
-      alert("Failed to update password.");
+      toast.error("Failed to update password");
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const handleForgetPassword = async () => {
-    setIsVerifyDialogOpen(false);
-    setIsForgetPasswordDialogOpen(true);
   };
 
   const handleSendForgetPasswordEmail = async () => {
     try {
+      setIsLoading(true);
       const accessToken = localStorage.getItem("accessToken");
       await axios.post(
-        "http://localhost:8080/user/forget-password",
-        { email: forgetPasswordEmail },
-        {
-          headers: { accessToken },
-        }
+        `${BACKEND_URI}/user/forget-password`,
+        { email: formState.forgetPasswordEmail },
+        { headers: { accessToken } }
       );
-      alert("Password reset email sent. Please check your inbox.");
-      setIsForgetPasswordDialogOpen(false);
+      toast.success(
+        "Password reset email sent. Please check your inbox for the OTP."
+      );
+      setDialogState((prev) => ({
+        ...prev,
+        forgetPassword: false,
+        newPassword: true,
+      }));
     } catch (error) {
       console.error("Error sending forget password email:", error);
-      alert("Failed to send forget password email.");
+      toast.error("Failed to send forget password email");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
+  const handleChangePassword = async () => {
+    try {
+      setIsLoading(true);
+      const accessToken = localStorage.getItem("accessToken");
+      await axios.post(
+        `${BACKEND_URI}/user/update/forget-password`,
+        {
+          otp: formState.otp,
+          newPassword: formState.newPasswordForReset,
+        },
+        { headers: { accessToken } }
+      );
+      toast.success("Password has been successfully reset.");
+      setDialogState((prev) => ({ ...prev, newPassword: false }));
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      toast.error("Failed to reset password");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onCropComplete = useCallback(
+    (_croppedArea: Area, croppedAreaPixels: Area) =>
+      setCroppedAreaPixels(
+        croppedAreaPixels as unknown as React.SetStateAction<null>
+      ),
+    []
+  );
 
   const handleOpenVerifyDialog = (purpose: "email" | "password") => {
     setVerifyPurpose(purpose);
-    setIsVerifyDialogOpen(true);
+    setDialogState((prev) => ({ ...prev, verify: true }));
   };
 
   const handleAvatarUpload = async () => {
     if (selectedImage && croppedAreaPixels) {
-      const croppedImage = await cropImageFile(
-        croppedAreaPixels,
-        selectedImage
-      );
-      if (croppedImage) {
-        const imageUrl = await handleUploadCroppedImage(croppedImage);
-        if (imageUrl) {
-          handleUpdate(["avatar_uri"]);
-          setIsAvatarDialogOpen(false);
+      try {
+        setIsLoading(true);
+        const croppedImage = await cropImageFile(
+          croppedAreaPixels,
+          selectedImage
+        );
+        if (croppedImage) {
+          const imageUrl = await handleUploadCroppedImage(croppedImage);
+          if (imageUrl) {
+            await handleUpdate(["avatar_uri"]);
+            setDialogState((prev) => ({ ...prev, avatar: false }));
+            toast.success("Avatar updated successfully!");
+          }
         }
+      } catch (error) {
+        console.error("Error uploading avatar:", error);
+        toast.error("Failed to update avatar");
+      } finally {
+        setIsLoading(false);
       }
     }
   };
 
+  const renderDialog = (
+    key: keyof typeof dialogState,
+    title: string,
+    description: string,
+    content: React.ReactNode
+  ) => (
+    <Dialog
+      open={dialogState[key]}
+      onOpenChange={(open) =>
+        setDialogState((prev) => ({ ...prev, [key]: open }))
+      }
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        {content}
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.5 }}
-      className="container mx-auto p-6 space-y-8"
     >
-      <Card>
+      <ToastContainer />
+      <Card className="bg-transparent">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <User className="w-6 h-6" />
@@ -250,64 +364,65 @@ const AccountContent: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center space-x-4">
-            <Avatar className="w-24 h-24">
+          <motion.div
+            className="flex items-center space-x-4"
+            whileHover={{ scale: 1.05 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            <Avatar className="w-20 h-20">
               <AvatarImage src={user.avatar_uri} />
               <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <Button
-              onClick={() => setIsAvatarDialogOpen(true)}
+              onClick={() =>
+                setDialogState((prev) => ({ ...prev, avatar: true }))
+              }
               variant="outline"
             >
               <Camera className="w-4 h-4 mr-2" /> Change Avatar
             </Button>
-          </div>
+          </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                value={user.username}
-                onChange={(e) => handleInputChange("username", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={user.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="gender">Gender</Label>
-              <Select
-                onValueChange={(value) => handleInputChange("gender", value)}
-                value={user.gender}
+            {["username", "name", "gender", "birthday"].map((field) => (
+              <motion.div
+                key={field}
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 300 }}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="birthday">Birthday</Label>
-              <Input
-                id="birthday"
-                type="date"
-                value={user.birthday}
-                onChange={(e) => handleInputChange("birthday", e.target.value)}
-              />
-            </div>
+                <Label htmlFor={field}>
+                  {field.charAt(0).toUpperCase() + field.slice(1)}
+                </Label>
+                {field === "gender" ? (
+                  <Select
+                    onValueChange={(value) => handleInputChange(field, value)}
+                    value={user[field] || ""}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    id={field}
+                    type={field === "birthday" ? "date" : "text"}
+                    value={user[field as keyof typeof user] || ""}
+                    onChange={(e) => handleInputChange(field, e.target.value)}
+                  />
+                )}
+              </motion.div>
+            ))}
           </div>
 
-          <div>
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
             <Label htmlFor="about">About</Label>
             <Textarea
               id="about"
@@ -315,19 +430,23 @@ const AccountContent: React.FC = () => {
               onChange={(e) => handleInputChange("about", e.target.value)}
               className="h-24"
             />
-          </div>
+          </motion.div>
 
           <Button
             onClick={() =>
               handleUpdate(["name", "age", "gender", "birthday", "about"])
             }
+            disabled={isLoading}
           >
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
             Update Personal Information
           </Button>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-transparent">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Info className="w-6 h-6" />
@@ -335,179 +454,236 @@ const AccountContent: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <div className="flex items-center space-x-2">
+          {["email", "password"].map((field) => (
+            <motion.div
+              key={field}
+              className="flex items-center space-x-2"
+              whileHover={{ scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <Label htmlFor={field}>
+                {field.charAt(0).toUpperCase() + field.slice(1)}
+              </Label>
               <Input
-                id="email"
-                value={user.email}
+                id={field}
+                type={field === "password" ? "password" : "text"}
+                value={
+                  field === "password"
+                    ? "********"
+                    : user[field as keyof typeof user]
+                }
                 readOnly
                 className="flex-grow"
               />
               <Button
-                onClick={() => handleOpenVerifyDialog("email")}
+                onClick={() =>
+                  handleOpenVerifyDialog(field as "email" | "password")
+                }
                 variant="outline"
               >
-                <Mail className="w-4 h-4 mr-2" /> Change
+                {field === "email" ? (
+                  <Mail className="w-4 h-4 mr-2" />
+                ) : (
+                  <Lock className="w-4 h-4 mr-2" />
+                )}{" "}
+                Change
               </Button>
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <div className="flex items-center space-x-2">
-              <Input
-                id="password"
-                type="password"
-                value="********"
-                readOnly
-                className="flex-grow"
-              />
-              <Button
-                onClick={() => handleOpenVerifyDialog("password")}
-                variant="outline"
-              >
-                <Lock className="w-4 h-4 mr-2" /> Change
-              </Button>
-            </div>
-          </div>
+            </motion.div>
+          ))}
         </CardContent>
       </Card>
 
       <AnimatePresence>
-        {/* Avatar Dialog */}
-        {isAvatarDialogOpen && (
-          <Dialog
-            open={isAvatarDialogOpen}
-            onOpenChange={setIsAvatarDialogOpen}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Change Avatar</DialogTitle>
-                <DialogDescription>
-                  Upload and crop your new avatar image.
-                </DialogDescription>
-              </DialogHeader>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) =>
-                  handleImageSelect(e, setSelectedImage, setIsAvatarDialogOpen)
-                }
-              />
-              {selectedImage && (
-                <div className="relative h-64">
-                  <Cropper
-                    image={selectedImage}
-                    crop={crop}
-                    zoom={zoom}
-                    aspect={1}
-                    onCropChange={setCrop}
-                    onZoomChange={setZoom}
-                    onCropComplete={onCropComplete}
-                  />
-                </div>
-              )}
-              <Button onClick={handleAvatarUpload}>Upload New Avatar</Button>
-            </DialogContent>
-          </Dialog>
+        {renderDialog(
+          "avatar",
+          "Change Avatar",
+          "Upload and crop your new avatar image.",
+          <>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) =>
+                handleImageSelect(
+                  e as React.ChangeEvent<HTMLInputElement>,
+                  setSelectedImage as unknown as React.Dispatch<
+                    React.SetStateAction<File[]>
+                  >,
+                  () => setDialogState((prev) => ({ ...prev, avatar: true }))
+                )
+              }
+            />
+            {selectedImage && (
+              <div className="relative h-64">
+                <Cropper
+                  image={selectedImage}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1}
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={onCropComplete}
+                />
+              </div>
+            )}
+            <Button onClick={handleAvatarUpload} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Upload New Avatar
+            </Button>
+          </>
         )}
 
-        {/* Verify Account Dialog */}
-        {isVerifyDialogOpen && (
-          <Dialog
-            open={isVerifyDialogOpen}
-            onOpenChange={setIsVerifyDialogOpen}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Verify Account</DialogTitle>
-                <DialogDescription>
-                  Please enter your email and password to verify your account.
-                </DialogDescription>
-              </DialogHeader>
-              <Input
-                placeholder="Email"
-                value={verifyEmail}
-                onChange={(e) => setVerifyEmail(e.target.value)}
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={verifyPassword}
-                onChange={(e) => setVerifyPassword(e.target.value)}
-              />
-              <Button onClick={handleVerifyAccount}>Verify Account</Button>
-              <Button onClick={handleForgetPassword}>Forgot Password</Button>
-            </DialogContent>
-          </Dialog>
+        {renderDialog(
+          "verify",
+          "Verify Account",
+          "Please enter your email and password to verify your account.",
+          <>
+            <Input
+              placeholder="Email"
+              value={formState.verifyEmail}
+              onChange={(e) => handleFormChange("verifyEmail", e.target.value)}
+            />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={formState.verifyPassword}
+              onChange={(e) =>
+                handleFormChange("verifyPassword", e.target.value)
+              }
+            />
+            <Button onClick={handleVerifyAccount} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Verify Account
+            </Button>
+            <Button
+              onClick={() =>
+                setDialogState((prev) => ({
+                  ...prev,
+                  verify: false,
+                  forgetPassword: true,
+                }))
+              }
+            >
+              Forgot Password
+            </Button>
+          </>
         )}
 
-        {/* Email Change Dialog */}
-        {isEmailDialogOpen && (
-          <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Change Email</DialogTitle>
-                <DialogDescription>
-                  Enter your new email address.
-                </DialogDescription>
-              </DialogHeader>
-              <Input
-                placeholder="New Email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-              />
-              <Button onClick={handleEmailChange}>Update Email</Button>
-            </DialogContent>
-          </Dialog>
+        {renderDialog(
+          "email",
+          "Change Email",
+          "Enter your new email address.",
+          <>
+            <Input
+              placeholder="New Email"
+              value={formState.newEmail}
+              onChange={(e) => handleFormChange("newEmail", e.target.value)}
+            />
+            <Button onClick={handleEmailChange} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Update Email
+            </Button>
+          </>
         )}
 
-        {/* Password Change Dialog */}
-        {isPasswordDialogOpen && (
-          <Dialog
-            open={isPasswordDialogOpen}
-            onOpenChange={setIsPasswordDialogOpen}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Change Password</DialogTitle>
-                <DialogDescription>Enter your new password.</DialogDescription>
-              </DialogHeader>
-              <Input
-                type="password"
-                placeholder="New Password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
-              <Button onClick={handlePasswordChange}>Update Password</Button>
-            </DialogContent>
-          </Dialog>
+        {renderDialog(
+          "otp",
+          "Confirm Email Change",
+          "Enter the OTP sent to your new email address.",
+          <>
+            <Input
+              placeholder="New Email"
+              value={formState.newEmail}
+              readOnly
+            />
+            <Input
+              placeholder="OTP"
+              value={formState.emailOtp}
+              onChange={(e) => handleFormChange("emailOtp", e.target.value)}
+            />
+            <Button onClick={handleConfirmEmailChange} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Change Email
+            </Button>
+          </>
         )}
 
-        {/* Forget Password Dialog */}
-        {isForgetPasswordDialogOpen && (
-          <Dialog
-            open={isForgetPasswordDialogOpen}
-            onOpenChange={setIsForgetPasswordDialogOpen}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Forgot Password</DialogTitle>
-                <DialogDescription>
-                  Enter your email to receive a password reset link.
-                </DialogDescription>
-              </DialogHeader>
-              <Input
-                placeholder="Email"
-                value={forgetPasswordEmail}
-                onChange={(e) => setForgetPasswordEmail(e.target.value)}
-              />
-              <Button onClick={handleSendForgetPasswordEmail}>
-                Send Reset Email
-              </Button>
-            </DialogContent>
-          </Dialog>
+        {renderDialog(
+          "password",
+          "Change Password",
+          "Enter your new password.",
+          <>
+            <Input
+              type="password"
+              placeholder="New Password"
+              value={formState.newPassword}
+              onChange={(e) => handleFormChange("newPassword", e.target.value)}
+            />
+            <Button onClick={handlePasswordChange} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Update Password
+            </Button>
+          </>
+        )}
+
+        {renderDialog(
+          "forgetPassword",
+          "Forgot Password",
+          "Enter your email to receive a password reset link.",
+          <>
+            <Input
+              placeholder="Email"
+              value={formState.forgetPasswordEmail}
+              onChange={(e) =>
+                handleFormChange("forgetPasswordEmail", e.target.value)
+              }
+            />
+            <Button
+              onClick={handleSendForgetPasswordEmail}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Send Reset Email
+            </Button>
+          </>
+        )}
+
+        {renderDialog(
+          "newPassword",
+          "Reset Password",
+          "Enter your new password and the OTP sent to your email.",
+          <>
+            <Input
+              type="password"
+              placeholder="New Password"
+              value={formState.newPasswordForReset}
+              onChange={(e) =>
+                handleFormChange("newPasswordForReset", e.target.value)
+              }
+            />
+            <Input
+              placeholder="OTP"
+              value={formState.otp}
+              onChange={(e) => handleFormChange("otp", e.target.value)}
+            />
+            <Button onClick={handleChangePassword} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Change Password
+            </Button>
+          </>
         )}
       </AnimatePresence>
     </motion.div>
