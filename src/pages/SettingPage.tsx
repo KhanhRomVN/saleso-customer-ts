@@ -1,6 +1,38 @@
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Cropper from "react-easy-crop";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+import AccountContent from "./components/AccountContent";
+import AddressContent from "./components/AddressContent";
 
 const SettingPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState("account");
@@ -30,7 +62,7 @@ const SettingPage: React.FC = () => {
         orientation="horizontal"
         value={activeTab}
         onValueChange={setActiveTab}
-        className="flex flex-col md:flex-row flex-grow h-screen"
+        className="flex flex-col md:flex-row flex-grow "
       >
         <div className="w-[15%] pt-[100px]">
           <TabsList className="flex flex-col bg-transparent items-start">
@@ -64,13 +96,6 @@ const SettingPage: React.FC = () => {
       </Tabs>
     </div>
   );
-};
-const AccountContent = () => {
-  return <div>Account</div>;
-};
-
-const AddressContent = () => {
-  return <div>Address</div>;
 };
 
 const OrderContent = () => {
