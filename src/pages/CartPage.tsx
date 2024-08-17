@@ -120,7 +120,6 @@ const CartPage: React.FC = () => {
     };
 
     localStorage.setItem("checkoutData", JSON.stringify(checkoutData));
-
     navigate("/checkout");
   };
 

@@ -139,44 +139,54 @@ const NotificationDropdown: React.FC = () => (
   </DropdownMenu>
 );
 
-const UserDropdown: React.FC<{ currentUser: User }> = ({ currentUser }) => (
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <motion.div whileHover={{ scale: 1.1 }}>
-        <Button
-          variant="ghost"
-          className="relative h-8 w-8 rounded-full overflow-hidden"
-        >
-          <Avatar className="h-8 w-8">
-            <AvatarImage
-              src="/api/placeholder/40/40"
-              alt={currentUser.username}
-            />
-            <AvatarFallback>{currentUser.username[0]}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </motion.div>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-56">
-      <DropdownMenuItem>
-        <User className="mr-2 h-4 w-4" />
-        <span>My Account</span>
-      </DropdownMenuItem>
-      <DropdownMenuItem>
-        <Settings className="mr-2 h-4 w-4" />
-        <span>Settings</span>
-      </DropdownMenuItem>
-      <DropdownMenuItem>
-        <Moon className="mr-2 h-4 w-4" />
-        <span>Change Theme</span>
-      </DropdownMenuItem>
-      <Separator />
-      <DropdownMenuItem className="text-red-500">
-        <LogOut className="mr-2 h-4 w-4" />
-        <span>Logout</span>
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
-);
+const UserDropdown: React.FC<{ currentUser: User }> = ({ currentUser }) => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // Implement logout logic here
+    localStorage.removeItem("currentUser");
+    navigate("/login");
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <motion.div whileHover={{ scale: 1.1 }}>
+          <Button
+            variant="ghost"
+            className="relative h-8 w-8 rounded-full overflow-hidden"
+          >
+            <Avatar className="h-8 w-8">
+              <AvatarImage
+                src="/api/placeholder/40/40"
+                alt={currentUser.username}
+              />
+              <AvatarFallback>{currentUser.username[0]}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </motion.div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 bg-background_secondary">
+        <DropdownMenuItem onClick={() => navigate("/setting")}>
+          <User className="mr-2 h-4 w-4" />
+          <span>My Account</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/setting")}>
+          <Settings className="mr-2 h-4 w-4" />
+          <span>Settings</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Moon className="mr-2 h-4 w-4" />
+          <span>Change Theme</span>
+        </DropdownMenuItem>
+        <Separator />
+        <DropdownMenuItem className="text-red-500" onClick={handleLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Logout</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
 
 export default MainHeader;

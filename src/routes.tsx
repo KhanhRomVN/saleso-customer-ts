@@ -5,6 +5,8 @@ import ProductPage from "./pages/ProductPage";
 import WishlistPage from "./pages/WishlistPage";
 import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
+import OrderSuccessPage from "./pages/OrderSuccessPage";
+import SettingPage from "./pages/SettingPage";
 
 // Layout Component
 import DefaultLayout from "@/layout/defaultLayout";
@@ -55,6 +57,22 @@ const publicRoutes = [
     element: (
       <DefaultLayout>
         <CheckoutPage />
+      </DefaultLayout>
+    ),
+  },
+  {
+    path: "/order-success",
+    element: (
+      <DefaultLayout>
+        <OrderSuccessPage />
+      </DefaultLayout>
+    ),
+  },
+  {
+    path: "/setting",
+    element: (
+      <DefaultLayout>
+        <SettingPage />
       </DefaultLayout>
     ),
   },
