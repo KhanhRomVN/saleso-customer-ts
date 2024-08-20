@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,7 +50,7 @@ import {
   Trash,
   MapPin,
   Package,
-  Truck,
+  // Truck,
   CheckCircle,
   XCircle,
   DollarSign,
@@ -942,61 +942,50 @@ const AddressContent: React.FC = () => {
   );
 };
 
+interface Order {
+  _id: string;
+  product_image: string;
+  product_name: string;
+  product_id: string;
+  quantity: number;
+  total_amount: number;
+  order_status: string;
+}
+
 const OrderContent: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState("Pending");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchOrders = async () => {
+      setIsLoading(true);
       try {
         const accessToken = localStorage.getItem("accessToken");
-        const response = await axios.get(`${BACKEND_URI}/order`, {
-          headers: { accessToken },
-        });
+        const response = await axios.get(
+          `${BACKEND_URI}/order/${activeTab.toLowerCase()}`,
+          {
+            headers: { accessToken },
+          }
+        );
         setOrders(response.data);
       } catch (error) {
         console.error("Error fetching orders:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchOrders();
-  }, []);
+  }, [activeTab]);
 
-  const filterOrders = (status: string) => {
-    return orders.filter((order) => {
-      switch (status) {
-        case "Pending":
-          return order.order_status === "pending";
-        case "In delivering":
-          return (
-            order.order_status === "accepted" &&
-            order.payment_status === "unpaid"
-          );
-        case "Successful":
-          return (
-            order.order_status === "accepted" && order.payment_status === "paid"
-          );
-        case "Refuse":
-          return order.order_status === "refused" || order.return_order;
-        default:
-          return false;
-      }
-    });
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Pending":
-        return <Package className="w-6 h-6 text-yellow-500" />;
-      case "In delivering":
-        return <Truck className="w-6 h-6 text-blue-500" />;
-      case "Successful":
-        return <CheckCircle className="w-6 h-6 text-green-500" />;
-      case "Refuse":
-        return <XCircle className="w-6 h-6 text-red-500" />;
-      default:
-        return null;
-    }
-  };
+  const statusIcons = useMemo(
+    () => ({
+      Pending: <Package className="w-6 h-6 text-yellow-500" />,
+      Accepted: <CheckCircle className="w-6 h-6 text-green-500" />,
+      Refused: <XCircle className="w-6 h-6 text-red-500" />,
+    }),
+    []
+  );
 
   const renderOrderCard = (order: Order) => (
     <motion.div
@@ -1009,40 +998,36 @@ const OrderContent: React.FC = () => {
       <Card className="mb-4 hover:shadow-lg transition-shadow duration-300 bg-background">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Order ID: {order._id}</span>
-            {getStatusIcon(activeTab)}
+            <span className="text-sm md:text-base">Order ID: {order._id}</span>
+            {statusIcons[order.order_status as keyof typeof statusIcons]}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center mb-4">
             <img
-              src={order.image}
-              alt={order.name}
-              className="w-16 h-16 object-cover rounded-md mr-4"
+              src={order.product_image}
+              alt={order.product_name}
+              className="w-12 h-12 md:w-16 md:h-16 object-cover rounded-md mr-4"
             />
             <div>
-              <h3 className="font-semibold">{order.name}</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="font-semibold text-sm md:text-base">
+                {order.product_name}
+              </h3>
+              <p className="text-xs md:text-sm text-gray-500">
                 Product ID: {order.product_id}
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
             <p className="flex items-center">
               <ShoppingCart className="w-4 h-4 mr-2" /> Quantity:{" "}
               {order.quantity}
             </p>
             <p className="flex items-center">
-              <DollarSign className="w-4 h-4 mr-2" /> Total: ${order.total}
+              <DollarSign className="w-4 h-4 mr-2" /> Total: $
+              {order.total_amount}
             </p>
-            <p>Status: {order.order_status}</p>
-            <p>Payment: {order.payment_status}</p>
           </div>
-          {order.return_order && (
-            <p className="mt-2 text-red-500">
-              Return Reason: {order.return_order}
-            </p>
-          )}
         </CardContent>
       </Card>
     </motion.div>
@@ -1051,31 +1036,39 @@ const OrderContent: React.FC = () => {
   return (
     <div className="container mx-auto p-4">
       <Tabs defaultValue="Pending" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 mb-8">
-          {["Pending", "In delivering", "Successful", "Refuse"].map(
-            (status) => (
-              <TabsTrigger
-                key={status}
-                value={status}
-                className="flex items-center justify-center py-2"
-              >
-                {getStatusIcon(status)}
-                <span className="ml-2">{status}</span>
-              </TabsTrigger>
-            )
-          )}
+        <TabsList className="grid w-full grid-cols-3 mb-8">
+          {Object.keys(statusIcons).map((status) => (
+            <TabsTrigger
+              key={status}
+              value={status}
+              className="flex items-center justify-center py-2"
+            >
+              {statusIcons[status as keyof typeof statusIcons]}
+              <span className="ml-2 text-xs md:text-sm">{status}</span>
+            </TabsTrigger>
+          ))}
         </TabsList>
-        {["Pending", "In delivering", "Successful", "Refuse"].map((status) => (
+        {Object.keys(statusIcons).map((status) => (
           <TabsContent key={status} value={status}>
-            <h2 className="text-2xl font-bold mb-4 flex items-center">
-              {getStatusIcon(status)}
+            <h2 className="text-xl md:text-2xl font-bold mb-4 flex items-center">
+              {statusIcons[status as keyof typeof statusIcons]}
               <span className="ml-2">{status} Orders</span>
             </h2>
-            <AnimatePresence>
-              <div className="space-y-4">
-                {filterOrders(status).map(renderOrderCard)}
-              </div>
-            </AnimatePresence>
+            {isLoading ? (
+              <p className="text-center">Loading orders...</p>
+            ) : (
+              <AnimatePresence>
+                <div className="space-y-4">
+                  {orders.length > 0 ? (
+                    orders.map(renderOrderCard)
+                  ) : (
+                    <p className="text-center">
+                      No {status.toLowerCase()} orders found.
+                    </p>
+                  )}
+                </div>
+              </AnimatePresence>
+            )}
           </TabsContent>
         ))}
       </Tabs>
@@ -1087,19 +1080,15 @@ interface Order {
   _id: string;
   product_id: string;
   quantity: number;
-  price: number;
-  total: string;
+  total_amount: number;
   discount_id: string;
   shipping_address: string;
   shipping_fee: number;
-  payment_method: "postpaid" | "prepaid";
-  payment_status: "paid" | "unpaid";
   customer_id: string;
   seller_id: string;
-  order_status: "pending" | "accepted" | "refused";
-  return_order?: string;
-  name: string;
-  image: string;
+  order_status: string;
+  product_name: string;
+  product_image: string;
 }
 
 const PaymentContent = () => {

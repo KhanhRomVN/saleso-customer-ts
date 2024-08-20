@@ -130,7 +130,7 @@ const CheckoutPage: React.FC = () => {
   };
 
   const handleFinalCheckout = async () => {
-    const transformedData = checkoutData.items.map((item) => {
+    const orderItems = checkoutData.items.map((item) => {
       const discount = appliedDiscounts[item.product_id];
       const shipping_fee = 20;
       const total = calculateItemTotal(item).toFixed(2);
@@ -139,14 +139,10 @@ const CheckoutPage: React.FC = () => {
         product_id: item.product_id,
         quantity: item.quantity,
         selected_attributes_value: item.selected_attributes_value,
-        price: item.price,
-        total: parseFloat(total),
+        total_amount: parseFloat(total),
         discount_id: discount ? discount._id : undefined,
         shipping_address: shippingAddress,
         shipping_fee: shipping_fee,
-        payment_method:
-          paymentMethod === "Pay on delivery" ? "postpaid" : "prepaid",
-        payment_status: "unpaid",
       };
     });
 
@@ -160,7 +156,12 @@ const CheckoutPage: React.FC = () => {
       if (paymentMethod === "Pay on delivery") {
         const response = await axios.post(
           `${BACKEND_URI}/order`,
-          transformedData,
+          {
+            orderItems,
+            payment_method:
+              paymentMethod === "Pay on delivery" ? "postpaid" : "prepaid",
+            payment_status: "pending",
+          },
           {
             headers: {
               accessToken,

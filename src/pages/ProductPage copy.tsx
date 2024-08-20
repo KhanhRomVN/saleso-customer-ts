@@ -10,21 +10,13 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { Badge } from "@/components/ui/badge";
-import {
-  StarIcon,
-  // ThumbsUpIcon,
-  Star,
-  ThumbsUp,
-  Send,
-  Image as ImageIcon,
-} from "lucide-react";
+import { StarIcon, ThumbsUpIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { BACKEND_URI } from "@/api";
-import { toast } from "react-hot-toast";
 
 interface Attribute {
   attributes_value: string;
@@ -67,12 +59,6 @@ interface Feedback {
   updatedAt: string;
 }
 
-type FeedbackState = {
-  rating: number;
-  comment: string;
-  images: string[];
-};
-
 const ProductPage: React.FC = () => {
   const { product_id } = useParams<{ product_id: string }>();
   const [product, setProduct] = useState<Product | null>(null);
@@ -80,7 +66,7 @@ const ProductPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-  const [newFeedback, setNewFeedback] = useState<FeedbackState>({
+  const [newFeedback, setNewFeedback] = useState({
     rating: 0,
     comment: "",
     images: [],
@@ -396,12 +382,7 @@ const ProductDiscounts: React.FC<{ discounts: string[] }> = ({ discounts }) => (
 const RatingDistribution: React.FC<{ reviews: Product["reviews"] }> = ({
   reviews,
 }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5 }}
-    className="bg-background_secondary p-6 rounded-lg shadow-md"
-  >
+  <div className="bg-background_secondary p-6 rounded-lg shadow-md">
     <h2 className="text-2xl font-bold mb-4">Reviews Rating</h2>
     <div className="flex items-center mb-4">
       <div className="text-4xl font-bold mr-4">
@@ -415,63 +396,39 @@ const RatingDistribution: React.FC<{ reviews: Product["reviews"] }> = ({
       </div>
     </div>
     {reviews.ratingDistribution.map((dist) => (
-      <motion.div
-        key={dist.rating}
-        className="flex items-center mb-2"
-        whileHover={{ scale: 1.05 }}
-        transition={{ type: "spring", stiffness: 400, damping: 10 }}
-      >
-        <span className="w-8">
-          {dist.rating}{" "}
-          <Star className="inline-block h-4 w-4 text-yellow-400" />
-        </span>
+      <div key={dist.rating} className="flex items-center mb-2">
+        <span className="w-8">{dist.rating} star</span>
         <Progress
           value={(dist.count / reviews.totalReviews) * 100}
           className="w-64 mr-4"
         />
         <span>{dist.count}</span>
-      </motion.div>
+      </div>
     ))}
-  </motion.div>
+  </div>
 );
 
 const FeedbackForm: React.FC<{
-  newFeedback: FeedbackState;
-  setNewFeedback: React.Dispatch<React.SetStateAction<FeedbackState>>;
+  newFeedback: { rating: number; comment: string; images: string[] };
+  setNewFeedback: React.Dispatch<
+    React.SetStateAction<{ rating: number; comment: string; images: string[] }>
+  >;
   handleSubmitFeedback: (e: React.FormEvent) => Promise<void>;
 }> = ({ newFeedback, setNewFeedback, handleSubmitFeedback }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5 }}
-    className="bg-background_secondary p-6 rounded-lg shadow-md"
-  >
+  <div className="bg-background_secondary p-6 rounded-lg shadow-md">
     <h3 className="text-xl font-bold mb-4">Write Feedback</h3>
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        handleSubmitFeedback(e);
-        toast.success("Feedback submitted successfully!");
-      }}
-    >
+    <form onSubmit={handleSubmitFeedback}>
       <div className="mb-4">
         <label className="block mb-2">Rating</label>
         <div className="flex">
           {[1, 2, 3, 4, 5].map((star) => (
-            <motion.div
+            <StarIcon
               key={star}
-              whileHover={{ scale: 1.2 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Star
-                className={`h-6 w-6 cursor-pointer ${
-                  star <= newFeedback.rating
-                    ? "text-yellow-400"
-                    : "text-gray-300"
-                }`}
-                onClick={() => setNewFeedback({ ...newFeedback, rating: star })}
-              />
-            </motion.div>
+              className={`h-6 w-6 cursor-pointer ${
+                star <= newFeedback.rating ? "text-yellow-400" : "text-gray-300"
+              }`}
+              onClick={() => setNewFeedback({ ...newFeedback, rating: star })}
+            />
           ))}
         </div>
       </div>
@@ -487,109 +444,73 @@ const FeedbackForm: React.FC<{
       </div>
       <div className="mb-4">
         <label className="block mb-2">Images</label>
-        <div className="flex items-center">
-          <input
-            type="file"
-            multiple
-            accept="image/*"
-            className="hidden"
-            id="imageUpload"
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              const imageUrls = files.map((file) => URL.createObjectURL(file));
-              setNewFeedback({ ...newFeedback, images: imageUrls });
-            }}
-          />
-          <label
-            htmlFor="imageUpload"
-            className="cursor-pointer flex items-center"
-          >
-            <ImageIcon className="h-6 w-6 mr-2" />
-            <span>Upload Images</span>
-          </label>
-        </div>
+        <input
+          type="file"
+          multiple
+          accept="image/*"
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            // Here you would typically upload the files to your server or cloud storage
+            // and get back the URLs. For now, we'll just use local URLs.
+            const imageUrls = files.map((file) => URL.createObjectURL(file));
+            setNewFeedback({ ...newFeedback, images: imageUrls });
+          }}
+        />
       </div>
-      <Button type="submit" className="flex items-center">
-        <Send className="h-4 w-4 mr-2" />
-        Submit Feedback
-      </Button>
+      <Button type="submit">Submit Feedback</Button>
     </form>
-  </motion.div>
+  </div>
 );
 
 const FeedbackList: React.FC<{
   feedbacks: Feedback[];
   handleLikeFeedback: (feedbackId: string) => Promise<void>;
-}> = ({ feedbacks, handleLikeFeedback }) => {
-  if (feedbacks.length === 0) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="mt-4 text-center p-6 bg-background_secondary rounded-lg shadow-md"
-      >
-        <p className="text-xl font-semibold mb-2">No Feedback Yet</p>
-        <p className="text-gray-600">
-          Be the first to leave a review for this product!
-        </p>
-      </motion.div>
-    );
-  }
+}> = ({ feedbacks, handleLikeFeedback }) => (
+  <div className="mt-4">
+    <AnimatePresence>
+      {feedbacks.map((feedback) => (
+        <motion.div
+          key={feedback._id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Card className="mb-4 bg-background_secondary">
+            <CardContent className="p-4">
+              <div className="flex items-center mb-2">
+                <Avatar className="mr-2" />
+                <span className="font-semibold mr-2">{feedback.user_id}</span>
+                <ProductRating rating={feedback.rating} totalReviews={0} />
+              </div>
 
-  return (
-    <div className="mt-4">
-      <AnimatePresence>
-        {feedbacks.map((feedback) => (
-          <motion.div
-            key={feedback._id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Card className="mb-4 bg-background_secondary hover:shadow-lg transition-shadow duration-300">
-              <CardContent className="p-4">
-                <div className="flex items-center mb-2">
-                  <Avatar className="mr-2" />
-                  <span className="font-semibold mr-2">{feedback.user_id}</span>
-                  <ProductRating rating={feedback.rating} totalReviews={0} />
+              <p className="mb-2">{feedback.comment}</p>
+              {feedback.images.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {feedback.images.map((image, index) => (
+                    <img
+                      key={index}
+                      src={image}
+                      alt={`Feedback image ${index + 1}`}
+                      className="w-24 h-24 object-cover rounded"
+                    />
+                  ))}
                 </div>
-
-                <p className="mb-2">{feedback.comment}</p>
-                {feedback.images && feedback.images.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {feedback.images.map((image, index) => (
-                      <motion.img
-                        key={index}
-                        src={image}
-                        alt={`Feedback image ${index + 1}`}
-                        className="w-24 h-24 object-cover rounded"
-                        whileHover={{ scale: 1.1 }}
-                        transition={{ type: "spring", stiffness: 300 }}
-                      />
-                    ))}
-                  </div>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    handleLikeFeedback(feedback._id);
-                    toast.success("Feedback liked!");
-                  }}
-                  className="flex items-center"
-                >
-                  <ThumbsUp className="h-4 w-4 mr-1" />
-                  {feedback.likes?.length || 0}
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-};
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleLikeFeedback(feedback._id)}
+              >
+                <ThumbsUpIcon className="h-4 w-4 mr-1" />
+                {feedback.likes.length}
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ))}
+    </AnimatePresence>
+  </div>
+);
 
 export default ProductPage;
