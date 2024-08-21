@@ -158,8 +158,7 @@ const CheckoutPage: React.FC = () => {
           `${BACKEND_URI}/order`,
           {
             orderItems,
-            payment_method:
-              paymentMethod === "Pay on delivery" ? "postpaid" : "prepaid",
+            payment_method: "postpaid",
             payment_status: "pending",
           },
           {
@@ -171,7 +170,15 @@ const CheckoutPage: React.FC = () => {
         console.log("Order created successfully:", response.data);
         navigate("/order-success");
       } else {
-        localStorage.setItem("paymentData", JSON.stringify(transformedData));
+        localStorage.setItem(
+          "paymentData",
+          JSON.stringify({
+            orderItems,
+            total: calculateTotal(),
+            shippingAddress,
+            paymentMethod: "prepaid",
+          })
+        );
         navigate("/payment");
       }
     } catch (error) {

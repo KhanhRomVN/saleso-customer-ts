@@ -10,21 +10,16 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { Badge } from "@/components/ui/badge";
-import {
-  StarIcon,
-  // ThumbsUpIcon,
-  Star,
-  ThumbsUp,
-  Send,
-  Image as ImageIcon,
-} from "lucide-react";
+import { StarIcon, Star, Send, ImageIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { BACKEND_URI } from "@/api";
-import { toast } from "react-hot-toast";
+// import { toast } from "react-hot-toast";
+import { cropImageFile, handleUploadCroppedImage } from "@/utils/imageUtils";
+import Cropper, { Area } from "react-easy-crop";
 
 interface Attribute {
   attributes_value: string;
@@ -57,12 +52,13 @@ interface Product {
 interface Feedback {
   _id: string;
   user_id: string;
+  username: string;
+  is_owner: boolean;
   product_id: string;
+  owner_id: string;
   rating: number;
   comment: string;
   images: string[];
-  likes: string[];
-  reply: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -91,9 +87,12 @@ const ProductPage: React.FC = () => {
       try {
         const [productResponse, feedbacksResponse] = await Promise.all([
           axios.get(`${BACKEND_URI}/product/${product_id}`),
-          axios.get(`${BACKEND_URI}/feedback/list/feedback/${product_id}`),
+          axios.post(`${BACKEND_URI}/feedback/product-feedbacks`, {
+            product_id,
+          }),
         ]);
         setProduct(productResponse.data);
+        console.log(feedbacksResponse.data);
         setFeedbacks(feedbacksResponse.data);
       } catch (err) {
         setError(`Failed to fetch data: ${err}`);
@@ -114,7 +113,7 @@ const ProductPage: React.FC = () => {
 
     try {
       const response = await axios.post(
-        `${BACKEND_URI}/feedback/create`,
+        `${BACKEND_URI}/feedback`,
         {
           product_id,
           rating: newFeedback.rating,
@@ -127,31 +126,6 @@ const ProductPage: React.FC = () => {
       setNewFeedback({ rating: 0, comment: "", images: [] });
     } catch (error) {
       console.error("Error submitting feedback:", error);
-    }
-  };
-
-  const handleLikeFeedback = async (feedback_id: string) => {
-    const accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) {
-      alert("Please log in to like feedback");
-      return;
-    }
-
-    try {
-      await axios.post(
-        `${BACKEND_URI}/feedback/like/${feedback_id}`,
-        {},
-        { headers: { accessToken } }
-      );
-      setFeedbacks((prev) =>
-        prev.map((feedback) =>
-          feedback._id === feedback_id
-            ? { ...feedback, likes: [...feedback.likes, "currentUserId"] }
-            : feedback
-        )
-      );
-    } catch (error) {
-      console.error("Error liking feedback:", error);
     }
   };
 
@@ -185,10 +159,7 @@ const ProductPage: React.FC = () => {
           handleSubmitFeedback={handleSubmitFeedback}
         />
       </div>
-      <FeedbackList
-        feedbacks={feedbacks}
-        handleLikeFeedback={handleLikeFeedback}
-      />
+      <FeedbackList feedbacks={feedbacks} />
     </div>
   );
 };
@@ -285,10 +256,10 @@ const ProductDetails: React.FC<{
   </motion.div>
 );
 
-const ProductRating: React.FC<{ rating: number; totalReviews: number }> = ({
-  rating,
-  totalReviews,
-}) => (
+const ProductRating: React.FC<{
+  rating: number;
+  totalReviews: number | null;
+}> = ({ rating, totalReviews }) => (
   <div className="flex items-center">
     <div className="flex items-center mr-4">
       {[1, 2, 3, 4, 5].map((star) => (
@@ -300,7 +271,9 @@ const ProductRating: React.FC<{ rating: number; totalReviews: number }> = ({
         />
       ))}
     </div>
-    <span className="text-sm text-gray-600">{totalReviews} reviews</span>
+    {totalReviews && (
+      <span className="text-sm text-gray-600">{totalReviews} reviews</span>
+    )}
   </div>
 );
 
@@ -439,101 +412,227 @@ const FeedbackForm: React.FC<{
   newFeedback: FeedbackState;
   setNewFeedback: React.Dispatch<React.SetStateAction<FeedbackState>>;
   handleSubmitFeedback: (e: React.FormEvent) => Promise<void>;
-}> = ({ newFeedback, setNewFeedback, handleSubmitFeedback }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5 }}
-    className="bg-background_secondary p-6 rounded-lg shadow-md"
-  >
-    <h3 className="text-xl font-bold mb-4">Write Feedback</h3>
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        handleSubmitFeedback(e);
-        toast.success("Feedback submitted successfully!");
-      }}
-    >
-      <div className="mb-4">
-        <label className="block mb-2">Rating</label>
-        <div className="flex">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <motion.div
-              key={star}
-              whileHover={{ scale: 1.2 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Star
-                className={`h-6 w-6 cursor-pointer ${
-                  star <= newFeedback.rating
-                    ? "text-yellow-400"
-                    : "text-gray-300"
-                }`}
-                onClick={() => setNewFeedback({ ...newFeedback, rating: star })}
-              />
-            </motion.div>
-          ))}
-        </div>
-      </div>
-      <div className="mb-4">
-        <label className="block mb-2">Comment</label>
-        <Textarea
-          value={newFeedback.comment}
-          onChange={(e) =>
-            setNewFeedback({ ...newFeedback, comment: e.target.value })
-          }
-          rows={4}
-        />
-      </div>
-      <div className="mb-4">
-        <label className="block mb-2">Images</label>
-        <div className="flex items-center">
-          <input
-            type="file"
-            multiple
-            accept="image/*"
-            className="hidden"
-            id="imageUpload"
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              const imageUrls = files.map((file) => URL.createObjectURL(file));
-              setNewFeedback({ ...newFeedback, images: imageUrls });
-            }}
-          />
-          <label
-            htmlFor="imageUpload"
-            className="cursor-pointer flex items-center"
-          >
-            <ImageIcon className="h-6 w-6 mr-2" />
-            <span>Upload Images</span>
-          </label>
-        </div>
-      </div>
-      <Button type="submit" className="flex items-center">
-        <Send className="h-4 w-4 mr-2" />
-        Submit Feedback
-      </Button>
-    </form>
-  </motion.div>
-);
+}> = ({ newFeedback, setNewFeedback, handleSubmitFeedback }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
-const FeedbackList: React.FC<{
-  feedbacks: Feedback[];
-  handleLikeFeedback: (feedbackId: string) => Promise<void>;
-}> = ({ feedbacks, handleLikeFeedback }) => {
-  if (feedbacks.length === 0) {
-    return (
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      const filesArray = Array.from(event.target.files).slice(0, 3);
+      setSelectedImages(filesArray);
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleImageCrop = (
+    _croppedArea: Area,
+    croppedAreaPixels: { x: number; y: number; width: number; height: number }
+  ) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  };
+
+  const handleSaveCroppedImage = async () => {
+    if (croppedAreaPixels && selectedImages.length > 0) {
+      const croppedImage = await cropImageFile(
+        croppedAreaPixels,
+        URL.createObjectURL(selectedImages[0])
+      );
+      if (croppedImage) {
+        const imageUrl = await handleUploadCroppedImage(croppedImage);
+        if (imageUrl) {
+          setNewFeedback({
+            ...newFeedback,
+            images: [...newFeedback.images, imageUrl],
+          });
+        }
+      }
+    }
+    setIsModalOpen(false);
+  };
+
+  return (
+    <div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="mt-4 text-center p-6 bg-background_secondary rounded-lg shadow-md"
+        className="bg-background_secondary p-6 rounded-lg shadow-md"
       >
-        <p className="text-xl font-semibold mb-2">No Feedback Yet</p>
-        <p className="text-gray-600">
-          Be the first to leave a review for this product!
-        </p>
+        <h3 className="text-xl font-bold mb-4">Write Feedback</h3>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmitFeedback(e);
+          }}
+        >
+          <div className="mb-4">
+            <label className="block mb-2">Rating</label>
+            <div className="flex">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <motion.div
+                  key={star}
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <Star
+                    className={`h-6 w-6 cursor-pointer ${
+                      star <= newFeedback.rating
+                        ? "text-yellow-400"
+                        : "text-gray-300"
+                    }`}
+                    onClick={() =>
+                      setNewFeedback({ ...newFeedback, rating: star })
+                    }
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </div>
+          <div className="mb-4">
+            <label className="block mb-2">Comment</label>
+            <Textarea
+              value={newFeedback.comment}
+              onChange={(e) =>
+                setNewFeedback({ ...newFeedback, comment: e.target.value })
+              }
+              rows={4}
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block mb-2">Images</label>
+            <div className="border-2 border-dashed border-gray-400 rounded-lg p-4 flex justify-center items-center cursor-pointer">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
+                id="imageUpload"
+                onChange={handleImageSelect}
+              />
+              <label
+                htmlFor="imageUpload"
+                className="flex flex-col items-center cursor-pointer"
+              >
+                <ImageIcon className="h-8 w-8 text-gray-400 mb-2 cursor-pointer" />
+                <span className="text-gray-400 cursor-pointer">
+                  Drop your images here or click upload image from device
+                </span>
+              </label>
+            </div>
+            {newFeedback.images.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {newFeedback.images.map((image, index) => (
+                  <motion.img
+                    key={index}
+                    src={image}
+                    alt={`Feedback image ${index + 1}`}
+                    className="w-24 h-24 object-cover rounded"
+                    whileHover={{ scale: 1.1 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          <Button type="submit" className="flex items-center w-full">
+            <Send className="h-4 w-4 mr-2" />
+            Submit Feedback
+          </Button>
+        </form>
       </motion.div>
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-gray-900 bg-opacity-75 flex justify-center items-center z-50"
+          >
+            <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
+              <h3 className="text-xl font-bold mb-4">Crop Image</h3>
+              <div className="relative h-64">
+                <Cropper
+                  image={URL.createObjectURL(selectedImages[0])}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1}
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={handleImageCrop}
+                />
+              </div>
+              <div className="flex justify-end mt-4">
+                <Button
+                  variant="secondary"
+                  className="mr-2"
+                  onClick={() => setIsModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveCroppedImage}>Save</Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const FeedbackList: React.FC<{
+  feedbacks: Feedback[];
+}> = ({ feedbacks }) => {
+  if (feedbacks.length === 0) {
+    return (
+      <div className="mt-4">
+        <AnimatePresence>
+          {feedbacks.map((feedback) => (
+            <motion.div
+              key={feedback._id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card className="mb-4 bg-background_secondary hover:shadow-lg transition-shadow duration-300">
+                <CardContent className="p-4">
+                  <div className="flex items-center mb-2">
+                    <Avatar className="mr-2" />
+                    <span className="font-semibold mr-2">
+                      {feedback.username}
+                    </span>
+                    <ProductRating rating={feedback.rating} totalReviews={0} />
+                  </div>
+
+                  <p className="mb-2">{feedback.comment}</p>
+                  {feedback.images && feedback.images.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {feedback.images.map((image, index) => (
+                        <motion.img
+                          key={index}
+                          src={image}
+                          alt={`Feedback image ${index + 1}`}
+                          className="w-24 h-24 object-cover rounded"
+                          whileHover={{ scale: 1.1 }}
+                          transition={{ type: "spring", stiffness: 300 }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     );
   }
 
@@ -552,8 +651,10 @@ const FeedbackList: React.FC<{
               <CardContent className="p-4">
                 <div className="flex items-center mb-2">
                   <Avatar className="mr-2" />
-                  <span className="font-semibold mr-2">{feedback.user_id}</span>
-                  <ProductRating rating={feedback.rating} totalReviews={0} />
+                  <span className="font-semibold mr-2">
+                    {feedback.username}
+                  </span>
+                  <ProductRating rating={feedback.rating} totalReviews={null} />
                 </div>
 
                 <p className="mb-2">{feedback.comment}</p>
@@ -571,18 +672,6 @@ const FeedbackList: React.FC<{
                     ))}
                   </div>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    handleLikeFeedback(feedback._id);
-                    toast.success("Feedback liked!");
-                  }}
-                  className="flex items-center"
-                >
-                  <ThumbsUp className="h-4 w-4 mr-1" />
-                  {feedback.likes?.length || 0}
-                </Button>
               </CardContent>
             </Card>
           </motion.div>

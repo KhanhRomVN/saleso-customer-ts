@@ -40,7 +40,11 @@ const publicRoutes = [
     path: "/wishlist",
     element: (
       <DefaultLayout>
-        <WishlistPage />
+        <WishlistPage
+          openCart={function (): void {
+            throw new Error("Function not implemented.");
+          }}
+        />
       </DefaultLayout>
     ),
   },
